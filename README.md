@@ -1,1 +1,1 @@
-Update trigger 
+Update trigger
