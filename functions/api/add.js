@@ -14,13 +14,28 @@ export async function onRequestOptions() {
   return json({ ok: true }, 204)
 }
 
+function getBearerToken(authHeader = "") {
+  // aceita variações de espaços e capitalização
+  const match = authHeader.match(/^\s*Bearer\s+(.+)\s*$/i)
+  return match ? match[1].trim() : ""
+}
+
 export async function onRequestPost(context) {
   const { env, request } = context
 
-  const auth = request.headers.get("Authorization") || ""
-  const expected = `Bearer ${env.ADMIN_TOKEN}`
+  const auth = request.headers.get("Authorization") || request.headers.get("authorization") || ""
+  const incomingToken = getBearerToken(auth)
+  const expectedToken = String(env.ADMIN_TOKEN || "").trim()
 
-  if (auth !== expected) {
+  if (!incomingToken) {
+    return json({ ok: false, error: "MISSING_BEARER" }, 401)
+  }
+
+  if (!expectedToken) {
+    return json({ ok: false, error: "SERVER_MISCONFIGURED_NO_ADMIN_TOKEN" }, 500)
+  }
+
+  if (incomingToken !== expectedToken) {
     return json({ ok: false, error: "UNAUTHORIZED" }, 401)
   }
 
@@ -40,13 +55,7 @@ export async function onRequestPost(context) {
     return json({ ok: false, error: "MISSING_KEY_OR_IP" }, 400)
   }
 
-  const record = {
-    key,
-    ip,
-    product,
-    status,
-    createdAt: new Date().toISOString(),
-  }
+  const record = { key, ip, product, status, createdAt: new Date().toISOString() }
 
   await env.LICENSES.put(key, JSON.stringify(record))
 
